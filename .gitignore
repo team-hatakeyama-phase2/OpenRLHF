@@ -148,3 +148,6 @@ core
 .nfs*
 *jianh*
 *test_scripts*
+
+# wandb
+wandb/
