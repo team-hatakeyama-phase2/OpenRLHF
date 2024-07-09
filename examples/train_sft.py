@@ -62,10 +62,18 @@ def train(args):
     )
 
     train_dataloader = strategy.setup_dataloader(
-        train_dataset, args.micro_train_batch_size, True, True, train_dataset.collate_fn
+        train_dataset,
+        args.micro_train_batch_size,
+        True,
+        True,
+        train_dataset.packing_collate_fn if args.packing_samples else train_dataset.collate_fn,
     )
     eval_dataloader = strategy.setup_dataloader(
-        eval_dataset, args.micro_train_batch_size, True, False, eval_dataset.collate_fn
+        eval_dataset,
+        args.micro_train_batch_size,
+        True,
+        False,
+        eval_dataset.packing_collate_fn if args.packing_samples else eval_dataset.collate_fn,
     )
 
     # scheduler
@@ -130,7 +138,7 @@ if __name__ == "__main__":
     parser.add_argument("--max_epochs", type=int, default=2)
     parser.add_argument("--micro_train_batch_size", type=int, default=8)
     parser.add_argument("--train_batch_size", type=int, default=128)
-    parser.add_argument("--max_samples", type=int, default=1000000)
+    parser.add_argument("--max_samples", type=int, default=10000000)
     parser.add_argument("--max_len", type=int, default=512)
     parser.add_argument("--max_norm", type=float, default=1.0)
     parser.add_argument("--l2", type=float, default=0)
@@ -158,10 +166,13 @@ if __name__ == "__main__":
     parser.add_argument("--gradient_checkpointing_use_reentrant", action="store_true")
     parser.add_argument("--disable_fast_tokenizer", action="store_true", default=False)
 
+    # packing SFT samples without CrossAttention
+    parser.add_argument("--packing_samples", action="store_true", default=False)
+
     # custom dataset key name
     parser.add_argument("--input_key", type=str, default=None)
     parser.add_argument("--output_key", type=str, default=None)
-    parser.add_argument("--input_template", type=str, default="Human: {}\nAssistant: ")
+    parser.add_argument("--input_template", type=str, default="User: {}\nAssistant: ")
     parser.add_argument("--apply_chat_template", action="store_true", default=False)
     parser.add_argument("--tokenizer_chat_template", type=str, default=None)
 

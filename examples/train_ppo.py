@@ -291,7 +291,7 @@ if __name__ == "__main__":
     parser.add_argument("--prompt_max_len", type=int, default=1024)
     parser.add_argument("--generate_max_len", type=int, default=1024)
     parser.add_argument("--max_len", type=int, default=None)
-    parser.add_argument("--max_samples", type=int, default=100000)
+    parser.add_argument("--max_samples", type=int, default=1000000)
     parser.add_argument("--max_norm", type=float, default=1.0)
     parser.add_argument("--l2", type=float, default=0.0)
     parser.add_argument("--ptx_coef", type=float, default=0.05)
@@ -341,7 +341,7 @@ if __name__ == "__main__":
 
     # custom dataset key name
     parser.add_argument("--input_key", type=str, default=None)
-    parser.add_argument("--input_template", type=str, default="Human: {}\nAssistant: ")
+    parser.add_argument("--input_template", type=str, default="User: {}\nAssistant: ")
     parser.add_argument("--apply_chat_template", action="store_true", default=False)
 
     # wandb pamameters

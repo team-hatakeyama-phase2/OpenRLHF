@@ -4,61 +4,45 @@ import torch
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
-from .utils import exist_and_not_none, process_multi_turn_dialogue, zero_pad_sequences
-
+from .utils import exist_and_not_none, zero_pad_sequences
+import warnings
 
 def preprocess_data(
-    data, input_template=None, prompt_key=None, chosen_key=None, rejected_key=None, apply_chat_template=None
+    data,
+    input_template=None,
+    prompt_key=None,
+    chosen_key="chosen",
+    rejected_key="rejected",
+    apply_chat_template=None,
+    is_dpo=False,
 ) -> str:
-    # custom dataset
-    if chosen_key and rejected_key:
+    prompt = ""
+    chosen = data[chosen_key]
+    rejected = data[rejected_key]
+    assert isinstance(prompt, str), prompt
+    assert isinstance(chosen, str), chosen
+    assert isinstance(rejected, str), rejected
+
+    if apply_chat_template:
+        chosen = apply_chat_template(chosen, tokenize=False)
+        rejected = apply_chat_template(rejected, tokenize=False)
+
+        if is_dpo:
+            prompt = apply_chat_template(data[chosen_key][:-1], tokenize=False, add_generation_prompt=True)
+            chosen = chosen[len(prompt) :]
+            rejected = rejected[len(prompt) :]
+    else:
         if prompt_key:
             prompt = data[prompt_key]
-        else:
-            prompt = ""
-            input_template = None  # do not modified with input template again
-        chosen = data[chosen_key]
-        rejected = data[rejected_key]
-
-        if apply_chat_template:
-            chosen = apply_chat_template(chosen, tokenize=False)
-            rejected = apply_chat_template(rejected, tokenize=False)
-            prompt = ""
-            input_template = None
-    else:
-        # Anthropic/hh-rlhf
-        if exist_and_not_none(data, "chosen") and exist_and_not_none(data, "rejected"):
-            # tasksource/oasst1_pairwise_rlhf_reward
-            prompt = data["prompt"] if exist_and_not_none(data, "prompt") else ""
-            if prompt and prompt.startswith("prompter:"):
-                prompt = (
-                    prompt.replace("prompter:", "\nHuman: ").replace("assistant:", "\nAssistant: ") + "\nAssistant: "
-                )
-            chosen = data["chosen"]
-            rejected = data["rejected"]
-        # lmsys/chatbot_arena_conversations
-        elif exist_and_not_none(data, "winner") and exist_and_not_none(data, "conversation_a"):
-            prompt = ""
-            chosen = data["conversation_a"] if data["winner"] == "model_a" else data["conversation_b"]
-            rejected = data["conversation_b"] if data["winner"] == "model_a" else data["conversation_a"]
-            chosen = process_multi_turn_dialogue(chosen)
-            rejected = process_multi_turn_dialogue(rejected)
-            input_template = None  # do not modified with input template again
-        # openai/webgpt_comparisons
-        elif exist_and_not_none(data, "answer_0") and exist_and_not_none(data, "answer_1"):
-            prompt = data["question"]["full_text"]
-            chosen = data["answer_0"] if data["score_0"] > data["score_1"] else data["answer_1"]
-            rejected = data["answer_1"] if data["score_0"] > data["score_1"] else data["answer_0"]
-        else:
-            raise ValueError("Unknown reward dataset")
+            if input_template:
+                prompt = input_template.format(prompt)
 
     # margin loss
     margin = data["margin"] if exist_and_not_none(data, "margin") else 0
 
-    # input template
-    if input_template:
-        prompt = input_template.format(prompt)
-
+    assert isinstance(prompt, str), prompt
+    assert isinstance(chosen, str), chosen
+    assert isinstance(rejected, str), rejected
     return prompt, chosen, rejected, margin
 
 
@@ -78,7 +62,7 @@ class RewardDataset(Dataset):
         tokenizer: Callable,
         max_length: int,
         strategy,
-        input_template="Human: {}\nAssistant: ",
+        input_template=None,
         is_dpo=False,
     ) -> None:
         super().__init__()
@@ -98,18 +82,25 @@ class RewardDataset(Dataset):
         self.is_dpo = is_dpo
 
         prompt_key = getattr(self.strategy.args, "prompt_key", None)
-        chosen_key = getattr(self.strategy.args, "chosen_key", None)
-        rejected_key = getattr(self.strategy.args, "rejected_key", None)
+        chosen_key = getattr(self.strategy.args, "chosen_key", "chosen")
+        rejected_key = getattr(self.strategy.args, "rejected_key", "rejected")
+        assert chosen_key == "chosen", self.strategy.args
+        assert rejected_key == "rejected", self.strategy.args
         apply_chat_template = getattr(self.strategy.args, "apply_chat_template", False)
         if apply_chat_template:
             apply_chat_template = self.tokenizer.apply_chat_template
+            tokenizer_chat_template = getattr(self.strategy.args, "tokenizer_chat_template", None)
+            if tokenizer_chat_template:
+                self.tokenizer.chat_template = tokenizer_chat_template
 
         for data in tqdm(dataset, disable=not self.strategy.is_rank_0()):
-            prompt, chosen, reject, margin = preprocess_data(
-                data, input_template, prompt_key, chosen_key, rejected_key, apply_chat_template
-            )
+            if data[chosen_key] is None or data[rejected_key] is None:
+                warnings.warn("NONE-SKIPPED: {}".format(data))
+                continue
 
-            # prompt_ids_len for prompt mask
+            prompt, chosen, reject, margin = preprocess_data(
+                data, input_template, prompt_key, chosen_key, rejected_key, apply_chat_template, self.is_dpo
+            )
             if self.is_dpo:
                 prompt_token = self.tokenizer(
                     prompt,
@@ -127,6 +118,9 @@ class RewardDataset(Dataset):
             else:
                 self.margins.append(margin)
 
+            assert isinstance(prompt, str), prompt
+            assert isinstance(chosen, str), chosen
+            assert isinstance(reject, str), reject
             self.prompts.append(prompt)
             self.chosens.append(chosen)
             self.rejects.append(reject)
@@ -137,11 +131,13 @@ class RewardDataset(Dataset):
 
     def __getitem__(self, idx):
         prompt, chosen, reject = self.prompts[idx], self.chosens[idx], self.rejects[idx]
+        assert isinstance(prompt, str), prompt
         if self.is_dpo:
             extra = self.prompt_ids_lens[idx]
         else:
             extra = self.margins[idx]
 
+        assert prompt is not None
         chosen = (prompt + chosen).rstrip("\n")
         if not chosen.endswith(self.tokenizer.eos_token):
             chosen += " " + self.tokenizer.eos_token

@@ -46,6 +46,7 @@ def batch_generate_vllm(args):
         temperature=args.temperature,
         repetition_penalty=args.repetition_penalty,
         skip_special_tokens=False,
+        truncate_prompt_tokens=args.prompt_max_len,
     )
 
     prompts_data = blending_datasets(
@@ -68,9 +69,9 @@ def batch_generate_vllm(args):
     prompts = list(prompts_dataset)
 
     # Conditional SFT inference
-    if args.enable_ca:
+    if args.enable_csft:
         for i in range(len(prompts)):
-            prompts[i] += args.ca_prompt.strip() + " "
+            prompts[i] += args.csft_prompt.strip() + " "
 
     # best of n
     N = args.best_of_n
@@ -147,16 +148,16 @@ def batch_generate(args):
 
     for prompts in pbar:
         # Conditional SFT inference
-        if args.enable_ca:
+        if args.enable_csft:
             for i in range(len(prompts)):
-                prompts[i] += args.ca_prompt.strip() + " "
+                prompts[i] += args.csft_prompt.strip() + " "
 
         inputs = tokenize_fn(prompts)
         for _ in range(N):
             outputs = model.model.generate(
                 **inputs,
                 use_cache=True,
-                max_length=args.max_len,
+                max_new_tokens=args.max_new_tokens,
                 do_sample=not args.greedy_sampling,
                 top_p=args.top_p,
                 early_stopping=True,
@@ -299,25 +300,24 @@ if __name__ == "__main__":
     parser.add_argument("--head_prefix", type=str, default="value_head")
 
     # custom dataset key name
-    parser.add_argument("--input_key", type=str, default=None)
-    parser.add_argument("--output_key", type=str, default=None)
+    parser.add_argument("--input_key", type=str, default="input")
+    parser.add_argument("--output_key", type=str, default="output")
     parser.add_argument("--apply_chat_template", action="store_true", default=False)
+    parser.add_argument("--input_template", type=str, default=None)
 
     # for generation
-    parser.add_argument("--ta_prompt", type=str, default=None)
     parser.add_argument("--prompt_max_len", type=int, default=1024)
     parser.add_argument("--greedy_sampling", action="store_true", default=False)
-    parser.add_argument("--top_p", type=float, default=0.9)
+    parser.add_argument("--top_p", type=float, default=1.0)
     parser.add_argument("--temperature", type=float, default=1.0)
-    parser.add_argument("--repetition_penalty", type=float, default=1.2)
+    parser.add_argument("--repetition_penalty", type=float, default=1.0)
     parser.add_argument("--best_of_n", type=int, default=1)
-    parser.add_argument("--input_template", type=str, default="Human: {}\nAssistant: ")
     parser.add_argument("--max_new_tokens", type=int, default=1024)
     parser.add_argument(
         "--post_processor",
         type=str,
         default=None,
-        help="set to rs (Rejection Sampling), ca (Conditional SFT), iter_dpo (Iterative DPO) or None",
+        help="set to rs (Rejection Sampling), csft (Conditional SFT), iter_dpo (Iterative DPO) or None",
     )
     # for vllm
     parser.add_argument("--tp_size", type=int, default=8)
@@ -331,8 +331,8 @@ if __name__ == "__main__":
     # for Conditional SFT
     parser.add_argument("--normalize_reward", action="store_true", default=False)
     parser.add_argument("--reward_template", type=str, default=None)
-    parser.add_argument("--enable_ca", action="store_true", default=False)
-    parser.add_argument("--ca_prompt", type=str, default="<rm_score>: 5.00", help="Conditional SFT prompt")
+    parser.add_argument("--enable_csft", action="store_true", default=False)
+    parser.add_argument("--csft_prompt", type=str, default="<rm_score>: 5.00", help="Conditional SFT prompt")
 
     args = parser.parse_args()
     if args.eval_task and args.eval_task == "generate":

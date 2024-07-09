@@ -4,12 +4,13 @@ read -r -d '' training_commands <<EOF
 ../train_sft.py \
     --max_len 2048 \
     --dataset Open-Orca/OpenOrca \
-    --dataset_probs 1.0 \
+    --input_key question \
+    --output_key response \
     --train_batch_size 128 \
     --micro_train_batch_size 4 \
     --max_samples 500000 \
     --pretrain mistralai/Mixtral-8x7B-v0.1 \
-    --save_path ./ckpt/mixtral_sft\
+    --save_path ./checkpoint/mixtral-sft-lora\
     --save_steps -1 \
     --logging_steps 1 \
     --eval_steps -1 \
