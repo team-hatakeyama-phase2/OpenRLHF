@@ -2,7 +2,7 @@ set -x
 
 read -r -d '' training_commands <<EOF
 ../train_dpo.py \
-     --save_path ./checkpoint/llama2-34b-dpo \
+     --save_path ./ckpt/13b_llama \
      --save_steps -1 \
      --logging_steps 1 \
      --eval_steps -1 \
@@ -15,10 +15,8 @@ read -r -d '' training_commands <<EOF
      --zero_stage 3 \
      --beta 0.1 \
      --learning_rate 5e-7 \
-     --dataset OpenLLMAI/preference_dataset_mixture2_and_safe_pku\
-     --apply_chat_template \
-     --chosen_key chosen \
-     --rejected_key rejected \
+     --dataset Anthropic/hh-rlhf,tasksource/oasst1_pairwise_rlhf_reward,lmsys/chatbot_arena_conversations,openai/webgpt_comparisons \
+     --dataset_probs 0.72,0.08,0.12,0.08 \
      --flash_attn \
      --gradient_checkpointing \
      --adam_offload
