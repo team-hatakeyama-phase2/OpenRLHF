@@ -29,6 +29,7 @@ pip install  --no-build-isolation  flash-attn==2.5.8
 
 # conda環境におけるリンカーに関連する以下の問題と類似のエラーが発生して
 # CPUAdamなどoptimizerのコンパイルに失敗するため以下のファイルコピーを実行 (ln -s などでも可)
+# LD_LIBRARY_PATHなどパス設定では解決しなかったように見えた
 # https://github.com/microsoft/DeepSpeed/issues/3929
 cp $CONDA_BASE/envs/$env_name/lib/*curand*so* $CONDA_BASE/envs/$env_name/lib/python3.10/site-packages/torch/lib/
 
