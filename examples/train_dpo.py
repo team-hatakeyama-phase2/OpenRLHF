@@ -164,7 +164,7 @@ if __name__ == "__main__":
     parser.add_argument("--zpg", type=int, default=1, help="ZeRO++ max partition size")
     parser.add_argument("--adam_offload", action="store_true", default=False)
     parser.add_argument("--flash_attn", action="store_true", default=False)
-    parser.add_argument("--max_samples", type=int, default=10000000)
+    parser.add_argument("--max_samples", type=int, default=1000000)
     parser.add_argument("--aux_loss_coef", type=float, default=0)
     parser.add_argument("--grad_accum_dtype", type=str, default=None)
     parser.add_argument("--disable_trace_cache", action="store_true", default=False)
@@ -179,7 +179,7 @@ if __name__ == "__main__":
     parser.add_argument("--prompt_key", type=str, default=None)
     parser.add_argument("--chosen_key", type=str, default=None)
     parser.add_argument("--rejected_key", type=str, default=None)
-    parser.add_argument("--input_template", type=str, default="User: {}\nAssistant: ")
+    parser.add_argument("--input_template", type=str, default="Human: {}\nAssistant: ")
     parser.add_argument("--apply_chat_template", action="store_true", default=False)
 
     # wandb pamameters

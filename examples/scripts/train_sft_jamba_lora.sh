@@ -6,13 +6,12 @@ set -x
 read -r -d '' training_commands <<EOF
 ../train_sft.py \
     --max_len 8192 \
-    --dataset Open-Orca/OpenOrca \
-    --input_key question \
-    --output_key response \
+    --dataset MaziyarPanahi/WizardLM_evol_instruct_V2_196k \
+    --dataset_probs 1.0 \
     --train_batch_size 128 \
     --micro_train_batch_size 4 \
     --pretrain ai21labs/Jamba-v0.1 \
-    --save_path ./checkpoint/jamba-sft-lora\
+    --save_path ./ckpt/jamba_wizard\
     --save_steps -1 \
     --logging_steps 1 \
     --eval_steps -1 \
