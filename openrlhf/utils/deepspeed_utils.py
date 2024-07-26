@@ -107,6 +107,34 @@ def get_optimizer_grouped_parameters(
     ]
     return optimizer_grouped_parameters
 
+def get_optimizer_grouped_parameters_without_freezed(
+    model,
+    weight_decay,
+    update_layer_name_list=[],
+    no_decay_name_list=["bias", "layer_norm.weight", "layernorm.weight", "norm.weight", "ln_f.weight"],
+):
+    optimizer_grouped_parameters = [
+        {
+            "params": [
+                p
+                for n, p in model.named_parameters()
+                if (not any(nd in n for nd in no_decay_name_list)\
+                 and p.requires_grad\
+                  and any( l in n for l in update_layer_name_list))
+            ],
+            "weight_decay": weight_decay,
+        },
+        {
+            "params": [
+                p
+                for n, p in model.named_parameters()
+                if (any(nd in n for nd in no_decay_name_list) and p.requires_grad)
+            ],
+            "weight_decay": 0.0,
+        },
+    ]
+    return optimizer_grouped_parameters
+
 
 def _z3_params_to_fetch(param_list):
     return [p for p in param_list if hasattr(p, "ds_id") and p.ds_status == ZeroParamStatus.NOT_AVAILABLE]
