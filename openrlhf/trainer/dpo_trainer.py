@@ -10,7 +10,7 @@ from torch.utils.data import DistributedSampler
 from tqdm import tqdm
 
 from openrlhf.models import DPOLoss, SwitchBalancingLoss
-
+import gc
 
 class DPOTrainer(ABC):
     """
@@ -134,6 +134,8 @@ class DPOTrainer(ABC):
                 loss = preference_loss + aux_loss * self.args.aux_loss_coef
                 self.strategy.backward(loss, self.model, self.optimizer)
                 self.strategy.optimizer_step(self.optimizer, self.model, self.scheduler)
+                torch.cuda.empty_cache()
+                gc.collect()
 
                 acc_mean = acc_mean * 0.9 + 0.1 * (chosen_reward > reject_reward).float().mean().item()
                 loss_mean = loss_mean * 0.9 + 0.1 * loss.item()
