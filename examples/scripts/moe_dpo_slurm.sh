@@ -55,11 +55,11 @@ srun --jobid $SLURM_JOBID bash -c 'python -m torch.distributed.run \
      --logging_steps 1 \
      --eval_steps 50 \
      --micro_train_batch_size 1 \
-     --train_batch_size 2048 \
+     --train_batch_size 10248 \
      --pretrain $OPENRLHF_LOAD_MODEL_NAME_OR_PATH \
      --bf16 \
      --max_epochs 1 \
-     --max_len 1024 \
+     --max_len 2048 \
      --zero_stage 3 \
      --beta 0.1 \
      --learning_rate 1e-6 \
