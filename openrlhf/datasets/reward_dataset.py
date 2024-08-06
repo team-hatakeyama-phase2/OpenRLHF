@@ -5,13 +5,27 @@ from torch.utils.data import Dataset
 from tqdm import tqdm
 
 from .utils import exist_and_not_none, process_multi_turn_dialogue, zero_pad_sequences
+import copy
+
+CHAT_TEMPLATE_JA = "{% if messages[0]['role'] == 'system' %}{% set system_message = messages[0]['content'] %}{% set messages = messages[1:] %}{% else %}{% set system_message = '以下は、タスクを説明する指示です。要求を適切に満たす応答を書きなさい。' %}{% endif %}{{\u3000bos_token }}{{\u3000system_message\u3000}}{% for message in messages %}{% if message['role'] == 'user' %}{{ '\n\n### 指示:\n' + message['content'] }}{% elif message['role'] == 'assistant' %}{{ '\n\n### 応答:\n' + message['content'] + eos_token }}{% endif %}{% if loop.last and add_generation_prompt %}{{ '\n\n### 応答:\n' }}{% endif %}{% endfor %}{% if messages[-1]['role'] == 'user' %}{{ '\n\n### 応答:\n' }}{% endif %}"
 
 
 def preprocess_data(
     data, input_template=None, prompt_key=None, chosen_key=None, rejected_key=None, apply_chat_template=None
 ) -> str:
     # custom dataset
-    if chosen_key and rejected_key:
+    if chosen_key and rejected_key and "messages" in data.keys():
+        # {"messages":[{"content":"str", "role":"str"}, {"content":"str", "role":"str"}], "chosen":"str", "rejected":"str"}
+        assert isinstance(data[chosen_key], str), data
+        assert isinstance(data[rejected_key], str), data
+        assert apply_chat_template is not None
+
+        prompt = apply_chat_template(data["messages"])
+        chosen = data[chosen_key]
+        # apply_chat_template([{"role":"assistant", "content":data[chosen_key]}])
+        rejected = data[rejected_key]
+        # apply_chat_template([{"role":"assistant", "content":data[rejected_key]}])
+    elif chosen_key and rejected_key:
         if prompt_key:
             prompt = data[prompt_key]
         else:
@@ -102,7 +116,13 @@ class RewardDataset(Dataset):
         rejected_key = getattr(self.strategy.args, "rejected_key", None)
         apply_chat_template = getattr(self.strategy.args, "apply_chat_template", False)
         if apply_chat_template:
-            apply_chat_template = self.tokenizer.apply_chat_template
+            if self.tokenizer.chat_template is None or self.tokenizer.chat_template == "":
+                self.tokenizer.chat_template = CHAT_TEMPLATE_JA
+
+            def _apply_chat_template(chat, *args, **kwargs):
+                return self.tokenizer.apply_chat_template(chat, add_generation_prompt=True)
+
+            apply_chat_template = _apply_chat_template
 
         for data in tqdm(dataset, disable=not self.strategy.is_rank_0()):
             prompt, chosen, reject, margin = preprocess_data(

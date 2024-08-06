@@ -19,6 +19,7 @@ def get_train_ds_config(
     zpg=8,
     grad_accum_dtype=None,
     disable_trace_cache=False,
+    offload_optimizer_pin_memory=True
 ):
     device = "cpu" if offload else "none"
     zero_opt_dict = {
@@ -26,7 +27,7 @@ def get_train_ds_config(
         "offload_param": {"device": device},
         "offload_optimizer": {
             "device": "cpu" if adam_offload else "none",
-            "pin_memory": True,
+            "pin_memory": offload_optimizer_pin_memory,
         },
         "sub_group_size": "auto",
         "stage3_max_live_parameters": "auto",
@@ -103,6 +104,37 @@ def get_optimizer_grouped_parameters(
                 if (any(nd in n for nd in no_decay_name_list) and p.requires_grad)
             ],
             "weight_decay": 0.0,
+        },
+    ]
+    return optimizer_grouped_parameters
+
+def get_optimizer_grouped_parameters_without_freezed(
+    model,
+    weight_decay,
+    no_decay_name_list=["bias", "layer_norm.weight", "layernorm.weight", "norm.weight", "ln_f.weight"],
+):
+    optimizer_grouped_parameters = [
+        {
+            "params": [
+                p
+                for n, p in model.named_parameters()
+                if (not any(nd in n for nd in no_decay_name_list) and p.requires_grad)
+            ],
+            "weight_decay": weight_decay,
+        },
+        {
+            "params": [
+                p
+                for n, p in model.named_parameters()
+                if (any(nd in n for nd in no_decay_name_list) and p.requires_grad)
+            ],
+            "weight_decay": 0.0,
+        },
+        {
+            "params": [
+                p for n, p in model.named_parameters() if  not p.requires_grad
+            ],
+            "lr": 0.0,
         },
     ]
     return optimizer_grouped_parameters
