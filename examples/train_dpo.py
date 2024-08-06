@@ -33,8 +33,13 @@ def train(args):
     )
 
     # configure tokenizer
-    tokenizer = get_tokenizer(args.pretrain, model.model, "right", strategy, use_fast=not args.disable_fast_tokenizer)
+    if args.tokenizer is None:
+        tokenizer = get_tokenizer(args.pretrain, model.model, args.padding_side, strategy, use_fast=not args.disable_fast_tokenizer)
+    else:
+        tokenizer = get_tokenizer(args.tokenizer, model.model, args.padding_side, strategy, use_fast=not args.disable_fast_tokenizer)
+
     strategy.print(model)
+    print("TPADDING_SIDE:", tokenizer.padding_side)
 
     # load weights for ref model
     ref_model = Actor(
@@ -46,7 +51,11 @@ def train(args):
     )
     if args.ref_offload:
         ref_model._offload = True
-    get_tokenizer(args.pretrain, ref_model.model, "right", strategy, use_fast=not args.disable_fast_tokenizer)
+
+    if args.tokenizer is None:
+        get_tokenizer(args.pretrain, ref_model.model, args.padding_side, strategy, use_fast=not args.disable_fast_tokenizer)
+    else:
+        get_tokenizer(args.tokenizer, ref_model.model, args.padding_side, strategy, use_fast=not args.disable_fast_tokenizer)
 
     # gradient_checkpointing
     if args.gradient_checkpointing:
@@ -133,6 +142,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--pretrain", type=str, default="bigscience/bloomz-1b7")
     parser.add_argument("--ref_pretrain", type=str, default=None)
+    parser.add_argument("--tokenizer", type=str, default=None)
     parser.add_argument("--dataset", type=str, default="Dahoas/full-hh-rlhf")
     parser.add_argument("--dataset_probs", type=str, default="1.0", help="sampling probs for datasets")
     parser.add_argument("--save_path", type=str, default="./ckpt")
@@ -181,6 +191,7 @@ if __name__ == "__main__":
     parser.add_argument("--rejected_key", type=str, default=None)
     parser.add_argument("--input_template", type=str, default="Human: {}\nAssistant: ")
     parser.add_argument("--apply_chat_template", action="store_true", default=False)
+    parser.add_argument("--padding_side", default="right", type=str, help="Mixtral and Flash Attn requires left")
 
     # wandb pamameters
     parser.add_argument("--use_wandb", type=str, default=None)
