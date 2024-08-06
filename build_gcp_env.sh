@@ -1,5 +1,13 @@
-env_name="dev29-openrlhf"
-## 
+#!/bin/bash
+
+env_name=$1
+
+if [ "$#" -ne 1 ]; then
+    env_name="dev29-openrlhf"
+    echo "Default conda env name is set to:"${env_name}
+else
+    echo "Your conda env name is:"${env_name}
+fi
 
 conda init bash
 CONDA_BASE=$(conda info --base)
