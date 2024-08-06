@@ -245,9 +245,10 @@ class DeepspeedStrategy(ABC):
         seed: int = 42,
         max_norm: float = 0.0,
         micro_train_batch_size=1,
-        train_batch_size=1,
+        train_batch_size=2048,
         zero_stage=2,
-        layer_id_trainable_from=30,
+        offload_param=True,
+        layer_id_trainable_from=28,
         bf16=True,
         args=None,
     ) -> None:
@@ -257,6 +258,8 @@ class DeepspeedStrategy(ABC):
         # self.optim_name = "adafactor"
         self.layer_id_trainable_from = layer_id_trainable_from
         self.stage = zero_stage
+        # assert self.stage == 3, self.stage
+        self.ds_offload_param = offload_param
         self.train_batch_size = train_batch_size
         self.micro_train_batch_size = micro_train_batch_size
         self.bf16 = bf16
@@ -270,6 +273,7 @@ class DeepspeedStrategy(ABC):
 
         self.is_rlhf = False
         self.time_steps = defaultdict(int)
+        print("train_batch_size:", self.train_batch_size, flush=True)
 
     def set_seed(self, seed: int) -> None:
         random.seed(seed)
@@ -301,8 +305,12 @@ class DeepspeedStrategy(ABC):
             return optim
         else:
             num_layers = model.config.num_hidden_layers
-            optim_params = get_optimizer_grouped_parameters_without_freezed(model, kwargs["weight_decay"], 
-            update_layer_name_list=[f"layers.{i}" for i in range(self.layer_id_trainable_from, num_layers)]+["lm_head"])
+            update_layer_name_list=[f"layers.{i}" for i in range(self.layer_id_trainable_from, num_layers)]+["lm_head"]
+            for n,p in model.named_parameters():
+                if any([l in n for l  in update_layer_name_list]):
+                    p.requires_grad = True
+                else:
+                    p.requires_grad = False
 
             AdamOptimizer = DeepSpeedCPUAdam if self.adam_offload else FusedAdam
             optim_params = get_optimizer_grouped_parameters(model, kwargs["weight_decay"])
@@ -382,9 +390,14 @@ class DeepspeedStrategy(ABC):
     def _ds_init_train_model(self, model, optim, scheduler):
         is_actor = isinstance(model, Actor)
         ds_config = self.get_ds_train_config(is_actor)
+        _model = model.model if is_actor else model
+        assert len([p for p in _model.parameters() if p.requires_grad]) > 0
+        print([p for p in _model.parameters() if p.requires_grad])
 
         engine, optim, _, scheduler = deepspeed.initialize(
-            model=model.model if is_actor else model,
+            model=_model,
+            # model.model if is_actor else model,
+            model_parameters=[p for p in _model.parameters() if p.requires_grad],
             optimizer=optim,
             lr_scheduler=scheduler,
             config=ds_config,
@@ -401,7 +414,7 @@ class DeepspeedStrategy(ABC):
     def get_ds_train_config(self, is_actor):
         # DS Config
         ds_config = get_train_ds_config(
-            offload=False,
+            offload=self.ds_offload_param,
             adam_offload=self.adam_offload,
             stage=self.stage,
             bf16=self.bf16,
@@ -417,6 +430,7 @@ class DeepspeedStrategy(ABC):
         if self.is_rlhf and is_actor and self.args.pretrain_data is not None:
             train_batch_size *= 2
         ds_config["train_batch_size"] = train_batch_size
+        print("ds_config:", train_batch_size, ds_config)
 
         return ds_config
 
