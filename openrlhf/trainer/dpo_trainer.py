@@ -82,9 +82,11 @@ class DPOTrainer(ABC):
             wandb.define_metric("eval/*", step_metric="eval/global_step", step_sync=True)
 
     def fit(self, args):
+        len_per_global_rank = self.train_dataloader.__len__()
         # get eval and save steps
+        print("len_per_global_rank:",len_per_global_rank)
         if args.eval_steps == -1:
-            args.eval_steps = self.train_dataloader.__len__()  # Evaluate once per epoch
+            args.eval_steps = len_per_global_rank  # Evaluate once per epoch
         if args.save_steps == -1:
             args.save_steps = float("inf")  # do not save ckpt
 
@@ -96,7 +98,7 @@ class DPOTrainer(ABC):
         )
         for epoch in range(self.epochs):
             step_bar = tqdm(
-                range(self.train_dataloader.__len__()),
+                range(len_per_global_rank),
                 desc="Train step of epoch %d" % epoch,
                 disable=not self.strategy.is_rank_0(),
             )
@@ -134,8 +136,8 @@ class DPOTrainer(ABC):
                 loss = preference_loss + aux_loss * self.args.aux_loss_coef
                 self.strategy.backward(loss, self.model, self.optimizer)
                 self.strategy.optimizer_step(self.optimizer, self.model, self.scheduler)
-                torch.cuda.empty_cache()
-                gc.collect()
+                # torch.cuda.empty_cache()
+                # gc.collect()
 
                 acc_mean = acc_mean * 0.9 + 0.1 * (chosen_reward > reject_reward).float().mean().item()
                 loss_mean = loss_mean * 0.9 + 0.1 * loss.item()
