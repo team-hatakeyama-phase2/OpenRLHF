@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --time 20:00:00              # maximum execution time (HH:MM:SS)
-#SBATCH --nodelist slurm0-a3-ghpc-[3,4,17,14]
+#SBATCH --nodelist slurm0-a3-ghpc-[5,6,7,8,9,10,11,12]
 
 #SBATCH --job-name=MnMoeDpo        # name
 #SBATCH --nodes=4                    # nodes
@@ -8,7 +8,7 @@
 #SBATCH --cpus-per-task=8            # number of cores per tasks
 #SBATCH --gres=gpu:8                 # number of gpus
 #SBATCH --mem-per-gpu=180G                 # number of gpus
-#SBATCH --time 20:00:00              # maximum execution time (HH:MM:SS)
+#SBATCH --time 24:00:00              # maximum execution time (HH:MM:SS)
 #SBATCH --output=%x-%j.out           # output file name
 
 CONDA_ENV_NAME="dev23-openrlhf"
@@ -29,11 +29,12 @@ export MASTER_PORT=9901
 #export OPENRLHF_DATA_LIST="team-hatakeyama-phase2/applied-chat-templace-dpo-120k"
 # "team-hatakeyama-phase2/synth-dpo-calm22b-250k"
 
-export OPENRLHF_LOAD_MODEL_NAME_OR_PATH="/storage5/shared/Nishijima/Llama-3-8b-MoE/9th_tonyu_iter_0001200"
+export OPENRLHF_LOAD_MODEL_NAME_OR_PATH="/storage5/someya/outputs/sftlab-experiments/8x8B/someya-sft_013-zero3_multi_node_no_offload"
+# "/storage5/shared/Nishijima/Llama-3-8b-MoE/9th_tonyu_iter_0001200"
 # "/storage5/someya/outputs/sftlab-experiments/8x8B/someya-sft_004-zero3_multi_node"
 # "/storage5/shared/Nishijima/Llama-3-8b-MoE/5th_tonyu_iter_7200"
 # "/storage5/someya/outputs/sftlab-experiments/8B/someya-sft_011-zero1"
-export OPENRLHF_SAVE_MODEL_PATH="/storage5/saito/03_4node_ckpt_moe_openrlhf"
+export OPENRLHF_SAVE_MODEL_PATH="/storage5/saito/04_4node_ckpt_moe_openrlhf"
 export OPENRLHF_DATA_LIST="team-hatakeyama-phase2/dpo-oai-format-mixed-95k"
 # "team-hatakeyama-phase2/dpo-oai-format-mixed-224k"
 # "team-hataKeyama-phase2/dpo-nemotron-math-coding-reasoning-14k,team-hatakeyama-phase2/dpo-multiturn-rand-genre-60k-len-80,team-hatakeyama-phase2/dpo-singleturn-rand-genre-140k"
@@ -55,11 +56,11 @@ srun --jobid $SLURM_JOBID bash -c 'python -m torch.distributed.run \
      --logging_steps 1 \
      --eval_steps 50 \
      --micro_train_batch_size 1 \
-     --train_batch_size 2048 \
+     --train_batch_size 1024 \
      --pretrain $OPENRLHF_LOAD_MODEL_NAME_OR_PATH \
      --bf16 \
      --max_epochs 1 \
-     --max_len 1024 \
+     --max_len 2048 \
      --zero_stage 3 \
      --beta 0.1 \
      --learning_rate 1e-6 \
