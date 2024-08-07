@@ -3,7 +3,7 @@
 #SBATCH --nodelist slurm0-a3-ghpc-[5,6,7,8,9,10,11,12]
 
 #SBATCH --job-name=MnMoeDpo        # name
-#SBATCH --nodes=4                    # nodes
+#SBATCH --nodes=8                    # nodes
 #SBATCH --ntasks-per-node=1          # crucial - only 1 task per dist per node!
 #SBATCH --cpus-per-task=8            # number of cores per tasks
 #SBATCH --gres=gpu:8                 # number of gpus
