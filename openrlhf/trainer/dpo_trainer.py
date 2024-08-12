@@ -55,7 +55,7 @@ class DPOTrainer(ABC):
         self.args = strategy.args
 
         self.beta = beta
-        self.loss_fn = DPOLoss(self.beta, self.args.label_smoothing, self.args.ipo)
+        self.loss_fn = DPOLoss(self.beta, self.args.label_smoothing, self.args.ipo, ddpo_lambda=self.args.ddpo_lambda)
 
         # Mixtral 8*7b
         self.aux_loss = self.args.aux_loss_coef > 1e-8
