@@ -110,11 +110,12 @@ class DPOLoss(nn.Module):
     DPO Loss
     """
 
-    def __init__(self, beta: float, label_smoothing: float = 0.0, ipo: bool = False) -> None:
+    def __init__(self, beta: float, label_smoothing: float = 0.0, ipo: bool = False, ddpo_lambda:float=-1) -> None:
         super().__init__()
         self.beta = beta
         self.label_smoothing = label_smoothing
         self.ipo = ipo
+        self.ddpo_lambda = ddpo_lambda
 
     def forward(
         self,
@@ -135,6 +136,10 @@ class DPOLoss(nn.Module):
                 -F.logsigmoid(self.beta * logits) * (1 - self.label_smoothing)
                 - F.logsigmoid(-self.beta * logits) * self.label_smoothing
             )
+
+        if self.ddpo_lambda > 0:
+            ref_win_slash_pi_win = reference_chosen_logps - policy_chosen_logps
+            losses = losses + self.ddpo_lambda * torch.clamp(ref_win_slash_pi_win, min=0.0)
 
         loss = losses.mean()
         chosen_rewards = self.beta * (policy_chosen_logps - reference_chosen_logps).detach()
